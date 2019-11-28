@@ -7,6 +7,20 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library('pacman')
+pacman::p_load(gdata,
+               metafor,
+               lme4,
+               tidyverse,
+               plyr,
+               reshape2,
+               data.table)
+
+data <- readxl::read_xlsx("Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
+df <- data[,c(2, 21:22, 69:72)]
+
+
 ```
 
 # Building on the shoulders of giants: meta-analysis
@@ -15,9 +29,102 @@ knitr::opts_chunk$set(echo = TRUE)
 
 1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. N.B. Only measures of pitch mean and pitch sd are required for the assignment. Feel free to ignore the rest (although pause behavior looks interesting, if you check my article).
 
+```{r}
+
+PitchMeanES <- metafor::escalc(data = df,
+                               measure = "SMD",
+                               n1i = SAMPLE_SIZE_SZ,
+                               n2i = SAMPLE_SIZE_HC,
+                               m1i = PITCH_F0_SZ_M,
+                               m2i = PITCH_F0_HC_M,
+                               sd1i = PITCH_F0_SZ_SD,
+                               sd2i = PITCH_F0_HC_SD)
+
+
+summary(PitchMeanES)
+
+model <- lmer(data = PitchMeanES,
+     na.action = "na.omit",
+     yi ~ 1 + (1|StudyID),
+     weights = 1 / vi,
+     REML = FALSE,
+     control = lmerControl(
+         check.nobs.vs.nlev = "ignore",
+         check.nobs.vs.nRE = "ignore"))
+
+model <- rma(yi, vi, data = PitchMeanES, slab = StudyID)
+forest(model)
+
+
+```
+
+
 2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
 
+``` {r}
+# load A3 data
+a3_data <- read.csv("C:/Users/frise/Documents/Code/A3/pitch_data.csv", header = TRUE)
+
+# summarize mean, sd and sample size by Study and Diagnosis
+a3 <- a3_data %>%
+    ddply(~Study + Diagnosis, summarise, mean=mean(mean), sd=mean(sd), sample_size=length(unique(Participant)))
+
+# rename factor levels
+a3$Diagnosis <- as.factor(a3$Diagnosis)
+levels(a3$Diagnosis) <- c("HC", "SZ")
+
+# convert to wide format
+a3 <- dcast(setDT(a3), Study~Diagnosis, value.var=c("mean", "sd", "sample_size"))
+
+# rename colnames to match the other data
+a3$Study <- a3$Study + 48 # 48 studies in the other analysis, so avoid conflicting ID's
+colnames(a3) <- c("StudyID",
+                  "PITCH_F0_HC_M",
+                  "PITCH_F0_SZ_M",
+                  "PITCH_F0_HC_SD",
+                  "PITCH_F0_SZ_SD",
+                  "SAMPLE_SIZE_HC",
+                  "SAMPLE_SIZE_SZ")
+
+# bind together by columns
+df_a3 <- rbind(df, a3)
+
+
+
+# now create new forest plot with extra data included
+PitchMeanES_a3 <- metafor::escalc(data = df_a3,
+                               measure = "SMD",
+                               n1i = SAMPLE_SIZE_SZ,
+                               n2i = SAMPLE_SIZE_HC,
+                               m1i = PITCH_F0_SZ_M,
+                               m2i = PITCH_F0_HC_M,
+                               sd1i = PITCH_F0_SZ_SD,
+                               sd2i = PITCH_F0_HC_SD)
+
+summary(PitchMeanES_a3)
+
+model <- lmer(data = PitchMeanES_a3,
+     na.action = "na.omit",
+     yi ~ 1 + (1|StudyID),
+     weights = 1 / vi,
+     REML = FALSE,
+     control = lmerControl(
+         check.nobs.vs.nlev = "ignore",
+         check.nobs.vs.nRE = "ignore"))
+
+model_a3 <- rma(yi, vi, data = PitchMeanES_a3, slab = StudyID)
+forest(model_a3)
+
+
+```
+
 3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
+
+``` {r}
+# creating funnel plots
+funnel(model)
+funnel(model_a3)
+```
 
 ## Tips on the process to follow:
 
