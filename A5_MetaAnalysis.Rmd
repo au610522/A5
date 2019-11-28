@@ -19,7 +19,7 @@ pacman::p_load(gdata,
 
 data <- readxl::read_xlsx("Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
 df <- data[,c(2, 21:22, 69:72)]
-
+df_info <- data[,c("StudyID", "SAMPLE_SIZE_SZ", "SAMPLE_SIZE_HC", "PITCH_F0_HC_M", "PITCH_F0_HC_SD", "PITCH_F0_SZ_M", "PITCH_F0_SZ_SD", "pitch_f0_variability", "frequency...68", "Title")]
 
 ```
 
@@ -39,7 +39,6 @@ PitchMeanES <- metafor::escalc(data = df,
                                m2i = PITCH_F0_HC_M,
                                sd1i = PITCH_F0_SZ_SD,
                                sd2i = PITCH_F0_HC_SD)
-
 
 summary(PitchMeanES)
 
@@ -101,9 +100,7 @@ PitchMeanES_a3 <- metafor::escalc(data = df_a3,
                                sd1i = PITCH_F0_SZ_SD,
                                sd2i = PITCH_F0_HC_SD)
 
-summary(PitchMeanES_a3)
-
-model <- lmer(data = PitchMeanES_a3,
+model_a3 <- lmer(data = PitchMeanES_a3,
      na.action = "na.omit",
      yi ~ 1 + (1|StudyID),
      weights = 1 / vi,
@@ -124,6 +121,17 @@ forest(model_a3)
 # creating funnel plots
 funnel(model)
 funnel(model_a3)
+
+# output of rma
+model_a3 %>% summary()
+# tau =  0.455
+# I^2 = 72.08%
+
+
+model %>% summary()
+# tau =  0.2668
+# I^2 = 50.29%
+
 ```
 
 ## Tips on the process to follow:
