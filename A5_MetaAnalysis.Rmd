@@ -1,13 +1,14 @@
 ---
 title: "Assignment 5 - Meta-analysis of pitch in schizophrenia"
-author: "Riccardo Fusaroli"
-date: "3/7/2019"
+author: "Mie, Cecilie, Tobias and Josephine"
+date: "4th of december 2019"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+#Library 
 library('pacman')
 pacman::p_load(gdata,
                metafor,
@@ -18,9 +19,8 @@ pacman::p_load(gdata,
                data.table)
 
 data <- readxl::read_xlsx("Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
-df <- data[,c(2, 21:22, 69:72)]
-df_info <- data[,c("StudyID", "SAMPLE_SIZE_SZ", "SAMPLE_SIZE_HC", "PITCH_F0_HC_M", "PITCH_F0_HC_SD", "PITCH_F0_SZ_M", "PITCH_F0_SZ_SD", "pitch_f0_variability", "frequency...68", "Title")]
 
+df <- data[,c(2, 21:22, 69:72)]
 ```
 
 # Building on the shoulders of giants: meta-analysis
@@ -30,7 +30,11 @@ df_info <- data[,c("StudyID", "SAMPLE_SIZE_SZ", "SAMPLE_SIZE_HC", "PITCH_F0_HC_M
 1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. N.B. Only measures of pitch mean and pitch sd are required for the assignment. Feel free to ignore the rest (although pause behavior looks interesting, if you check my article).
 
 ```{r}
+#calculating the % of studies usable of the total 4341 studies 
+# 6 usable studies out of 4341
+6/4341*100 #0.138217 % ~ 0.14 %
 
+#calculating yi and vi
 PitchMeanES <- metafor::escalc(data = df,
                                measure = "SMD",
                                n1i = SAMPLE_SIZE_SZ,
@@ -40,8 +44,16 @@ PitchMeanES <- metafor::escalc(data = df,
                                sd1i = PITCH_F0_SZ_SD,
                                sd2i = PITCH_F0_HC_SD)
 
-summary(PitchMeanES)
+#investigating the mean of the mean and the mean of the standard error
+new_data <- subset(PitchMeanES, StudyID == 1| StudyID == 5|StudyID == 11|StudyID == 18|StudyID == 28|StudyID == 50)
 
+mean(new_data$PITCH_F0_HC_M)
+mean(new_data$PITCH_F0_SZ_M)
+
+mean(new_data$PITCH_F0_HC_SD)
+mean(new_data$PITCH_F0_SZ_SD)
+
+# Creating a liniar mixed effect model for the data 
 model <- lmer(data = PitchMeanES,
      na.action = "na.omit",
      yi ~ 1 + (1|StudyID),
@@ -51,9 +63,11 @@ model <- lmer(data = PitchMeanES,
          check.nobs.vs.nlev = "ignore",
          check.nobs.vs.nRE = "ignore"))
 
+# creating a rma model to investigate the meta analysis
 model <- rma(yi, vi, data = PitchMeanES, slab = StudyID)
-forest(model)
 
+#creating a forest plot
+forest(model)
 
 ```
 
@@ -62,7 +76,7 @@ forest(model)
 
 ``` {r}
 # load A3 data
-a3_data <- read.csv("C:/Users/frise/Documents/Code/A3/pitch_data.csv", header = TRUE)
+a3_data <- read.csv("C:/Users/Bruger/Documents/Experimental methods III/A3/pitch_data.csv", header = TRUE)
 
 # summarize mean, sd and sample size by Study and Diagnosis
 a3 <- a3_data %>%
@@ -76,7 +90,7 @@ levels(a3$Diagnosis) <- c("HC", "SZ")
 a3 <- dcast(setDT(a3), Study~Diagnosis, value.var=c("mean", "sd", "sample_size"))
 
 # rename colnames to match the other data
-a3$Study <- a3$Study + 48 # 48 studies in the other analysis, so avoid conflicting ID's
+a3$Study <- a3$Study + 57 # 48 studies in the other analysis, so avoid conflicting ID's
 colnames(a3) <- c("StudyID",
                   "PITCH_F0_HC_M",
                   "PITCH_F0_SZ_M",
@@ -90,7 +104,7 @@ df_a3 <- rbind(df, a3)
 
 
 
-# now create new forest plot with extra data included
+# calculating the yi and the vi values for each study
 PitchMeanES_a3 <- metafor::escalc(data = df_a3,
                                measure = "SMD",
                                n1i = SAMPLE_SIZE_SZ,
@@ -100,6 +114,7 @@ PitchMeanES_a3 <- metafor::escalc(data = df_a3,
                                sd1i = PITCH_F0_SZ_SD,
                                sd2i = PITCH_F0_HC_SD)
 
+# creating a model for all studies 
 model_a3 <- lmer(data = PitchMeanES_a3,
      na.action = "na.omit",
      yi ~ 1 + (1|StudyID),
@@ -109,28 +124,51 @@ model_a3 <- lmer(data = PitchMeanES_a3,
          check.nobs.vs.nlev = "ignore",
          check.nobs.vs.nRE = "ignore"))
 
+# rma model for all studies
 model_a3 <- rma(yi, vi, data = PitchMeanES_a3, slab = StudyID)
+
+#forest plot for all data
 forest(model_a3)
 
+# for only assignment 3
+a3_info <- subset(PitchMeanES_a3, StudyID > 57)
 
+#rma model for only assignment 3
+model_a3_info <- rma(yi, vi, data = a3_info, slab = StudyID)
+
+#forest plot for a3
+forest(model_a3_info)
+
+# summarising all the models
+summary(model_a3_info)
+summary(model)
+summary(model_a3)
 ```
 
 3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
 
 ``` {r}
+#focusing on model a3 for all studies 
+
 # creating funnel plots
 funnel(model)
 funnel(model_a3)
 
+#Rank test of model a3 
+ranktest(model_a3)
+
+
 # output of rma
 model_a3 %>% summary()
+model_a3
 # tau =  0.455
 # I^2 = 72.08%
 
+# confident intervallerne 
+confint(model_a3)
 
-model %>% summary()
-# tau =  0.2668
-# I^2 = 50.29%
+# influence plot
+plot(influence(model_a3))
 
 ```
 
